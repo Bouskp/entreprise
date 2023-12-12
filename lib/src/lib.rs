@@ -1,51 +1,63 @@
-
-use std::io;
-use mongodb::Client;
-use mongodb::options::ClientOptions;
+use bson::{Document, to_document,doc};
+use mongodb::{Client, Collection, Database};
+use mongodb::results::{DeleteResult, InsertOneResult};
 use serde::{Deserialize, Serialize};
 
-pub struct Strucuture<'a> {
-	 db : &'a str,
-	 column : &'a str,
+#[derive(Debug, Clone)]
+pub struct Structure {
+	 db : Database,
+	 column : Collection<Worker>,
+	 client : Client
 }
 
-impl Strucuture<'_> {
-	pub fn new<'a>(str_connection : &'a str, db : &'a str, column : &'a str) -> Result<Strucuture<'a>, mongodb::error::Error> {
-
-
-		Ok(Strucuture {
-			db,
-			column
+impl Structure {
+	pub async fn new(db : &str, column : &str) -> Result<Structure, mongodb::error::Error> {
+		let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+		let database = client.database(db);
+		let collection = database.collection::<Worker>(column);
+		Ok(Structure {
+			db : database,
+			column : collection,
+			client
 		})
 	}
 
-
-	pub fn get_column<'a>(&'a self) -> &'a str {
-		self.column
+	pub fn get_client(&self)-> Client {
+		self.client.clone()
 	}
 
-	pub fn get_db<'a>(&'a self) -> &'a str { self.db}
+	pub fn get_db(&self) -> Database {
+		self.db.clone()
+	}
+
+	pub fn get_column(&self) -> Collection<Worker> { self.column.clone()}
 }
 
 
 
-pub fn connection()-> Result<Client, mongodb::error::Error> {
-	let client_options = ClientOptions::parse("mongodb://localhost:27017")?;
-	let client = Client::with_options(client_options)?;
-	Ok(client)
-}
 
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Worker {
-	nom : String,
-	prenom : String,
-	age : u32,
-	salaire : u64,
+	 pub nom : String,
+	 pub prenom : String,
+	 pub age : u64,
+	 pub salaire : u64,
 }
 
-pub fn create() {
 
+
+
+ pub async fn create(structure: &Structure)->Result<InsertOneResult, mongodb::error::Error> {
+	 let worker = Worker {
+		 nom : "Kouakou".to_string(),
+		 prenom: "Manien Hugues-Derek".to_string(),
+		 age: 24,
+		 salaire: 450000,
+	 };
+
+	let result = structure.get_column().insert_one(worker, None).await?;
+	 Ok(result)
 }
 
 pub fn read() {
@@ -56,7 +68,10 @@ pub fn update() {
 
 }
 
-pub fn delete() {
+pub async  fn delete(structure: &Structure, nom : &str)->Result<DeleteResult, mongodb::error::Error> {
+	let filter = doc! {"nom" : nom};
+	let result = structure.get_column().delete_one(filter, None).await?;
+	Ok(result)
 
 }
 
